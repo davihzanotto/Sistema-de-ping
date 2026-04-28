@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Ping",
+    "slug": "ping-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0F0F0F"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.trietel.ping"
+    },
+    "android": {
+      "package": "com.trietel.ping",
+      "googleServicesFile": "./google-services.json",
+      "useNextNotificationsApi": true
+    },
+    "notification": {
+      "icon": "./assets/icon.png",
+      "color": "#0F0F0F"
+    },
+    "plugins": ["expo-notifications"]
+  }
+}

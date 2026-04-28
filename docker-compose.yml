@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ping_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ping}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ping}
+      POSTGRES_DB: ${POSTGRES_DB:-ping}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ping_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ping} -d ${POSTGRES_DB:-ping}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: ping_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-ping}:${POSTGRES_PASSWORD:-ping}@db:5432/${POSTGRES_DB:-ping}
+      JWT_SECRET: ${JWT_SECRET:-troque-este-segredo}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-1440}
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-/app/firebase-credentials.json}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./firebase-credentials.json:/app/firebase-credentials.json:ro
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  ping_db_data:

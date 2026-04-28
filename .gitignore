@@ -1,0 +1,34 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+.env
+*.log
+*.sqlite3
+
+# Firebase
+firebase-credentials.json
+
+# Build
+dist/
+build/
+*.spec
+*.exe
+
+# Node / React Native
+node_modules/
+.expo/
+.expo-shared/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
