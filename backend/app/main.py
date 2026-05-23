@@ -10,6 +10,7 @@ from app.routers import (
     condominios,
     dispositivos,
     historico,
+    scan,
     usuarios,
 )
 
@@ -39,6 +40,7 @@ app.include_router(cameras.router, prefix="/api/cameras", tags=["Câmeras"])
 app.include_router(agente.router, prefix="/api/agente", tags=["Agente Local"])
 app.include_router(historico.router, prefix="/api/historico", tags=["Histórico"])
 app.include_router(dispositivos.router, prefix="/api/dispositivos", tags=["Dispositivos"])
+app.include_router(scan.router, prefix="/api/scan", tags=["Scan de Rede"])
 
 
 @app.get("/", tags=["Health"])

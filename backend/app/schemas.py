@@ -163,3 +163,101 @@ class ResultadoImportacao(BaseModel):
     total_importadas: int
     total_ignoradas: int
     cameras: List[CameraResposta]
+
+
+# -------------------- Scan de rede --------------------
+class ScanIniciar(BaseModel):
+    ip_inicio: str
+    ip_fim: str
+
+
+class ScanResultadoResposta(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    ip: str
+    online: bool
+    porta_554: bool
+    porta_80: bool
+    porta_8080: bool
+    confianca: str  # camera | provavel | outro
+    frame_base64: Optional[str] = None
+
+
+class ScanResposta(BaseModel):
+    """Status do scan + resultados parciais (consumido pelo app)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    condominio_id: int
+    ip_inicio: str
+    ip_fim: str
+    status: str  # pendente | executando | concluido | erro | cancelado
+    total_ips: int
+    progresso: int
+    mensagem_erro: Optional[str] = None
+    criado_em: datetime
+    iniciado_em: Optional[datetime] = None
+    finalizado_em: Optional[datetime] = None
+    resultados: List[ScanResultadoResposta] = []
+
+
+class ScanPendente(BaseModel):
+    """Scan que o agente deve executar."""
+
+    id: int
+    ip_inicio: str
+    ip_fim: str
+
+
+class ScanResultadoEnvio(BaseModel):
+    """Um resultado individual reportado pelo agente."""
+
+    ip: str
+    online: bool = False
+    porta_554: bool = False
+    porta_80: bool = False
+    porta_8080: bool = False
+    confianca: str = Field(
+        default="outro",
+        pattern="^(camera|provavel|outro)$",
+    )
+    frame_base64: Optional[str] = None
+
+
+class ScanProgressoEnvio(BaseModel):
+    """Lote de progresso/resultados enviado pelo agente periodicamente."""
+
+    scan_id: int
+    progresso: int
+    total_ips: Optional[int] = None
+    resultados: List[ScanResultadoEnvio] = []
+    finalizado: bool = False
+    mensagem_erro: Optional[str] = None
+
+
+class AgenteInfoEnvio(BaseModel):
+    """Heartbeat com metadados do agente (IP local etc.)."""
+
+    ip_local: Optional[str] = None
+    versao_agente: Optional[str] = None
+
+
+class RedeInfo(BaseModel):
+    """Sugestão de faixa para o scan, baseada no IP do agente."""
+
+    ip_agente: Optional[str] = None
+    faixa_inicio: Optional[str] = None
+    faixa_fim: Optional[str] = None
+    atualizado_em: Optional[datetime] = None
+
+
+# -------------------- Cadastro em massa de câmeras --------------------
+class CameraEmMassaItem(BaseModel):
+    nome: str
+    ip: str
+
+
+class CamerasEmMassa(BaseModel):
+    cameras: List[CameraEmMassaItem]

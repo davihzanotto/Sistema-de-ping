@@ -6,20 +6,31 @@ import * as Device from 'expo-device';
 
 /**
  * URL base resolvida em runtime:
- *   • Emulador Android  → http://10.0.2.2:8000   (alias do host pelo AVD)
- *   • Dispositivo físico → http://192.168.100.67:8000  (IP do PC na LAN)
- *
- * O usuário pode sobrescrever via `expo.extra.apiBaseUrl` no app.json para
- * apontar para um servidor de produção sem precisar mexer neste arquivo.
+ *   1. Override manual via `expo.extra.apiBaseUrl` no app.json (produção)
+ *   2. Em dev (Expo Go), detecta o IP automaticamente pelo debuggerHost
+ *   3. Emulador Android → http://10.0.2.2:8000 (alias do host pelo AVD)
+ *   4. Fallback → localhost
  */
-const URL_EMULADOR = 'http://10.0.2.2:8000';
-const URL_DISPOSITIVO_FISICO = 'http://192.168.100.67:8000';
+const PORTA_API = 8000;
 
 function resolverBaseUrl(): string {
   const override = Constants.expoConfig?.extra?.apiBaseUrl as string | undefined;
   if (override) return override;
-  // Device.isDevice = true em hardware real, false em emulador/simulador.
-  return Device.isDevice ? URL_DISPOSITIVO_FISICO : URL_EMULADOR;
+
+  // Em Expo Go, o debuggerHost contém o IP:porta do dev server (ex: "192.168.0.106:8081").
+  // Extraímos o IP e usamos a porta do backend.
+  const debuggerHost = Constants.expoGoConfig?.debuggerHost;
+  if (debuggerHost) {
+    const ip = debuggerHost.split(':')[0];
+    return `http://${ip}:${PORTA_API}`;
+  }
+
+  // Emulador Android (sem debuggerHost disponível)
+  if (!Device.isDevice) {
+    return `http://10.0.2.2:${PORTA_API}`;
+  }
+
+  return `http://localhost:${PORTA_API}`;
 }
 
 const BASE_URL = resolverBaseUrl();
@@ -263,4 +274,94 @@ export async function listarHistorico(filtros: {
 // -------------------- Dispositivos (FCM) --------------------
 export async function registrarDispositivo(token_fcm: string) {
   return api.post('/api/dispositivos/', { token_fcm });
+}
+
+// -------------------- Scan de rede --------------------
+export type ScanStatus = 'pendente' | 'executando' | 'concluido' | 'erro' | 'cancelado';
+export type ConfiancaScan = 'camera' | 'provavel' | 'outro';
+
+export type ScanResultado = {
+  id: number;
+  ip: string;
+  online: boolean;
+  porta_554: boolean;
+  porta_80: boolean;
+  porta_8080: boolean;
+  confianca: ConfiancaScan;
+  frame_base64?: string | null;
+};
+
+export type Scan = {
+  id: number;
+  condominio_id: number;
+  ip_inicio: string;
+  ip_fim: string;
+  status: ScanStatus;
+  total_ips: number;
+  progresso: number;
+  mensagem_erro?: string | null;
+  criado_em: string;
+  iniciado_em?: string | null;
+  finalizado_em?: string | null;
+  resultados: ScanResultado[];
+};
+
+export type RedeInfo = {
+  ip_agente?: string | null;
+  faixa_inicio?: string | null;
+  faixa_fim?: string | null;
+  atualizado_em?: string | null;
+};
+
+export async function obterRedeAgente(condominio_id: number) {
+  const { data } = await api.get<RedeInfo>(
+    `/api/scan/condominios/${condominio_id}/rede`,
+  );
+  return data;
+}
+
+export async function iniciarScan(
+  condominio_id: number,
+  ip_inicio: string,
+  ip_fim: string,
+) {
+  const { data } = await api.post<Scan>(
+    `/api/scan/condominios/${condominio_id}/iniciar`,
+    { ip_inicio, ip_fim },
+  );
+  return data;
+}
+
+export async function obterScanAtual(condominio_id: number) {
+  try {
+    const { data } = await api.get<Scan>(
+      `/api/scan/condominios/${condominio_id}/atual`,
+    );
+    return data;
+  } catch (e) {
+    const err = e as AxiosError;
+    if (err?.response?.status === 404) return null;
+    throw e;
+  }
+}
+
+export async function cancelarScan(condominio_id: number) {
+  const { data } = await api.post<Scan>(
+    `/api/scan/condominios/${condominio_id}/cancelar`,
+  );
+  return data;
+}
+
+export async function cadastrarCamerasEmMassa(
+  condominio_id: number,
+  cameras: { nome: string; ip: string }[],
+) {
+  const { data } = await api.post<{
+    total_importadas: number;
+    total_ignoradas: number;
+    cameras: Camera[];
+  }>(`/api/scan/condominios/${condominio_id}/cadastrar-selecionadas`, {
+    cameras,
+  });
+  return data;
 }

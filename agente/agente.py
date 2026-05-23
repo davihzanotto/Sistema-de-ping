@@ -23,10 +23,14 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
+import subprocess
+
 import requests
-from ping3 import ping
 
 import config
+import scanner
+
+VERSAO_AGENTE = "1.1.0"
 
 
 # -------------------- Logging --------------------
@@ -114,6 +118,73 @@ def reportar_evento(camera: EstadoCamera, evento: str) -> bool:
         return False
 
 
+def enviar_info_agente() -> None:
+    """Manda IP local + versão pro backend (heartbeat informativo)."""
+    ip_local = scanner.detectar_ip_local()
+    if not ip_local:
+        return
+    payload = {"ip_local": ip_local, "versao_agente": VERSAO_AGENTE}
+    try:
+        requests.post(
+            f"{_base_url()}/api/agente/info",
+            headers=_headers(),
+            json=payload,
+            timeout=10,
+        )
+    except Exception as exc:
+        log.debug("Falha ao enviar info do agente: %s", exc)
+
+
+def buscar_scan_pendente() -> Optional[dict]:
+    """Pergunta ao backend se há scan pendente. Retorna dict ou None."""
+    try:
+        r = requests.get(
+            f"{_base_url()}/api/agente/scan-pendente",
+            headers=_headers(),
+            timeout=10,
+        )
+        r.raise_for_status()
+        # Endpoint pode responder null (sem scan pendente)
+        if not r.text or r.text.strip() in ("null", ""):
+            return None
+        return r.json()
+    except Exception as exc:
+        log.debug("Falha ao buscar scan pendente: %s", exc)
+        return None
+
+
+def reportar_progresso_scan(
+    scan_id: int,
+    progresso: int,
+    total_ips: int,
+    novos: list,
+    finalizado: bool = False,
+    mensagem_erro: Optional[str] = None,
+) -> str:
+    """Manda lote de progresso/resultados pro backend. Retorna o status atual."""
+    payload = {
+        "scan_id": scan_id,
+        "progresso": progresso,
+        "total_ips": total_ips,
+        "resultados": [r.como_dict() for r in novos],
+        "finalizado": finalizado,
+        "mensagem_erro": mensagem_erro,
+    }
+    try:
+        r = requests.post(
+            f"{_base_url()}/api/agente/scan-progresso",
+            headers=_headers(),
+            json=payload,
+            timeout=30,
+        )
+        r.raise_for_status()
+        dados = r.json() if r.content else {}
+        return str(dados.get("status", ""))
+    except Exception as exc:
+        log.error("Falha ao reportar progresso de scan: %s", exc)
+        return ""
+
+
 def heartbeat(api_base_url: Optional[str] = None, token: Optional[str] = None) -> tuple[bool, str]:
     """Confirma que o token é válido. Retorna (ok, mensagem)."""
     base = (api_base_url or config.get().api_base_url).rstrip("/")
@@ -143,11 +214,24 @@ def heartbeat(api_base_url: Optional[str] = None, token: Optional[str] = None) -
 
 # -------------------- Lógica de ping --------------------
 def pingar(ip: str) -> bool:
+    """Usa o ping.exe do sistema — não exige privilégios de administrador."""
+    cfg = config.get()
+    timeout_ms = int(cfg.timeout_ping * 1000)
+    if sys.platform.startswith("win"):
+        cmd = ["ping", "-n", "1", "-w", str(timeout_ms), ip]
+    else:
+        cmd = ["ping", "-c", "1", "-W", str(int(cfg.timeout_ping)), ip]
     try:
-        resultado = ping(ip, timeout=config.get().timeout_ping, unit="s")
-        return bool(resultado) and resultado is not False
+        resultado = subprocess.run(
+            cmd,
+            capture_output=True,
+            timeout=cfg.timeout_ping + 2,
+        )
+        ok = resultado.returncode == 0
+        log.info("Pingando %s... %s", ip, "online" if ok else "offline")
+        return ok
     except Exception as exc:
-        log.debug("Erro no ping %s: %s", ip, exc)
+        log.info("Pingando %s... offline (erro: %s)", ip, exc)
         return False
 
 
@@ -163,6 +247,7 @@ def processar_camera(camera: EstadoCamera) -> None:
                 camera.online = True
     else:
         camera.falhas_consecutivas += 1
+        log.info('Câmera "%s" offline há %d falha(s)', camera.nome, camera.falhas_consecutivas)
         if (
             camera.falhas_consecutivas >= config.get().limite_falhas
             and camera.online is not False
@@ -181,6 +266,11 @@ def loop_ping() -> None:
         cfg.limite_falhas,
     )
     while estado.rodando:
+        n = len(estado.cameras)
+        if n:
+            log.info("--- Ciclo de ping: %d câmera(s) ---", n)
+        else:
+            log.warning("Nenhuma câmera carregada, aguardando sync...")
         for cam in list(estado.cameras.values()):
             if not estado.rodando:
                 break
@@ -194,7 +284,80 @@ def loop_ping() -> None:
 def loop_sync() -> None:
     while estado.rodando:
         sincronizar_cameras()
+        enviar_info_agente()
         for _ in range(config.get().intervalo_sync):
+            if not estado.rodando:
+                return
+            time.sleep(1)
+
+
+# -------------------- Loop de scan --------------------
+INTERVALO_POLL_SCAN = 5  # segundos
+
+
+def executar_scan(scan_id: int, ip_inicio: str, ip_fim: str) -> None:
+    """Roda um scan completo, reportando progresso ao backend."""
+    log.info("--- Scan #%d iniciado: %s → %s ---", scan_id, ip_inicio, ip_fim)
+    cancelado = {"valor": False}
+
+    def on_progresso(prog: scanner.ProgressoScan) -> bool:
+        if not estado.rodando or cancelado["valor"]:
+            return False
+        status = reportar_progresso_scan(
+            scan_id=scan_id,
+            progresso=prog.feitos,
+            total_ips=prog.total,
+            novos=prog.novos,
+            finalizado=False,
+        )
+        if status == "cancelado":
+            log.info("Scan #%d cancelado pelo backend", scan_id)
+            cancelado["valor"] = True
+            return False
+        return True
+
+    erro: Optional[str] = None
+    try:
+        scanner.escanear(
+            ip_inicio=ip_inicio,
+            ip_fim=ip_fim,
+            on_progresso=on_progresso,
+        )
+    except Exception as exc:
+        erro = f"{exc}"
+        log.exception("Erro no scan #%d: %s", scan_id, exc)
+
+    if cancelado["valor"]:
+        log.info("Scan #%d encerrado por cancelamento", scan_id)
+        return
+
+    # Finaliza
+    reportar_progresso_scan(
+        scan_id=scan_id,
+        progresso=0,
+        total_ips=0,
+        novos=[],
+        finalizado=True,
+        mensagem_erro=erro,
+    )
+    log.info("Scan #%d finalizado", scan_id)
+
+
+def loop_scan() -> None:
+    """Pesquisa por scans pendentes e os executa."""
+    log.info("Loop de scan iniciado (poll a cada %ss)", INTERVALO_POLL_SCAN)
+    while estado.rodando:
+        pendente = buscar_scan_pendente()
+        if pendente:
+            try:
+                executar_scan(
+                    scan_id=int(pendente["id"]),
+                    ip_inicio=str(pendente["ip_inicio"]),
+                    ip_fim=str(pendente["ip_fim"]),
+                )
+            except Exception as exc:
+                log.exception("Falha geral executando scan: %s", exc)
+        for _ in range(INTERVALO_POLL_SCAN):
             if not estado.rodando:
                 return
             time.sleep(1)
@@ -474,11 +637,14 @@ def main() -> None:
     log.info(msg)
 
     sincronizar_cameras()
+    enviar_info_agente()
 
     t1 = threading.Thread(target=loop_ping, daemon=True)
     t2 = threading.Thread(target=loop_sync, daemon=True)
+    t3 = threading.Thread(target=loop_scan, daemon=True)
     t1.start()
     t2.start()
+    t3.start()
 
     try:
         iniciar_tray()
@@ -488,6 +654,7 @@ def main() -> None:
         estado.rodando = False
         t1.join(timeout=5)
         t2.join(timeout=5)
+        t3.join(timeout=5)
         log.info("Agente encerrado")
 
 

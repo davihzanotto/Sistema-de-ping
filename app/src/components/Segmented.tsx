@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
-import { colors, spacing, typography } from '@/theme/theme';
+import { colors, gradients, radius, spacing, typography } from '@/theme/theme';
 
 type Option = { value: string; label: string };
 
@@ -17,13 +18,21 @@ export function Segmented({ options, value, onChange, style }: Props) {
       {options.map((opt) => {
         const active = opt.value === value;
         return (
-          <Pressable
-            key={opt.value}
-            onPress={() => onChange(opt.value)}
-            style={styles.opt}
-          >
-            <Text style={[styles.txt, active && styles.txtActive]}>{opt.label}</Text>
-            {active && <View style={styles.underline} />}
+          <Pressable key={opt.value} onPress={() => onChange(opt.value)} style={styles.opt}>
+            {active ? (
+              <LinearGradient
+                colors={gradients.primary}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.activePill}
+              >
+                <Text style={styles.txtActive}>{opt.label}</Text>
+              </LinearGradient>
+            ) : (
+              <View style={styles.idlePill}>
+                <Text style={styles.txt}>{opt.label}</Text>
+              </View>
+            )}
           </Pressable>
         );
       })}
@@ -34,24 +43,25 @@ export function Segmented({ options, value, onChange, style }: Props) {
 const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    gap: spacing.xl,
+    gap: spacing.sm,
+    flexWrap: 'wrap',
   },
-  opt: {
-    paddingVertical: spacing.md,
+  opt: {},
+  activePill: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
     alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
   },
-  txt: { ...typography.smallMedium, color: colors.textSubtle },
-  txtActive: { color: colors.text },
-  underline: {
-    position: 'absolute',
-    bottom: -1,
-    left: 0,
-    right: 0,
-    height: 1.5,
-    backgroundColor: colors.text,
+  idlePill: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
   },
+  txt: { ...typography.smallMedium, color: colors.textMuted },
+  txtActive: { ...typography.smallMedium, color: '#ffffff', fontWeight: '600' },
 });

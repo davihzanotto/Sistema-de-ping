@@ -10,6 +10,8 @@ import {
   Text,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 
 import { useAuth } from '@/hooks/useAuth';
 import { mensagemErro } from '@/services/api';
@@ -28,24 +30,24 @@ export function LoginScreen({ navigation }: any) {
   const [carregando, setCarregando] = useState(false);
 
   const fade = useRef(new Animated.Value(0)).current;
-  const slide = useRef(new Animated.Value(12)).current;
+  const slide = useRef(new Animated.Value(24)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fade, {
         toValue: 1,
-        duration: 400,
+        duration: 520,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.timing(slide, {
         toValue: 0,
-        duration: 400,
+        duration: 520,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     ]).start();
-  }, [fade, slide]);
+  }, []);
 
   function validar() {
     let ok = true;
@@ -79,6 +81,17 @@ export function LoginScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
+      <StatusBar style="light" />
+
+      {/* Glow radial no topo */}
+      <LinearGradient
+        colors={['rgba(26,86,219,0.22)', 'transparent']}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={styles.topGlow}
+      />
+      <View style={styles.orb} />
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
@@ -93,49 +106,42 @@ export function LoginScreen({ navigation }: any) {
               opacity: fade,
               transform: [{ translateY: slide }],
               width: '100%',
-              maxWidth: 360,
+              maxWidth: 380,
               alignSelf: 'center',
             }}
           >
             <Text style={styles.marca}>TRIETEL</Text>
-            <Text style={styles.titulo}>Entrar</Text>
-            <Text style={styles.subtitulo}>
-              Acesse o painel de monitoramento
-            </Text>
+            <Text style={styles.titulo}>{'Bem-vindo\nde volta.'}</Text>
+            <Text style={styles.subtitulo}>Acesse o painel de monitoramento</Text>
 
-            <View style={{ marginTop: spacing.xxxl }}>
+            <View style={styles.form}>
               <Input
                 label="E-mail"
                 placeholder="voce@empresa.com"
+                icon="mail-outline"
                 autoCapitalize="none"
                 autoComplete="email"
                 keyboardType="email-address"
                 value={email}
-                onChangeText={(t) => {
-                  setEmail(t);
-                  if (emailErro) setEmailErro(undefined);
-                }}
+                onChangeText={(t) => { setEmail(t); if (emailErro) setEmailErro(undefined); }}
                 errorText={emailErro}
               />
               <Input
                 label="Senha"
                 placeholder="••••••••"
+                icon="lock-closed-outline"
                 value={senha}
                 password
-                onChangeText={(t) => {
-                  setSenha(t);
-                  if (senhaErro) setSenhaErro(undefined);
-                }}
+                onChangeText={(t) => { setSenha(t); if (senhaErro) setSenhaErro(undefined); }}
                 errorText={senhaErro}
               />
-
               <Button full loading={carregando} onPress={onEntrar} style={{ marginTop: spacing.md }}>
                 Entrar
               </Button>
 
               <View style={styles.linhaInferior}>
                 <Text style={styles.linhaTxt}>Não tem conta?</Text>
-                <Pressable onPress={() => navigation.navigate('Register')} hitSlop={6}>
+                <Pressable onPress={() => navigation.navigate('Register')} hitSlop={8}>
                   <Text style={styles.link}>Criar conta</Text>
                 </Pressable>
               </View>
@@ -150,31 +156,51 @@ export function LoginScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: spacing.xl },
+  container: { flex: 1, backgroundColor: '#000000' },
+
+  topGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 420,
+  },
+  orb: {
+    position: 'absolute',
+    top: -190,
+    alignSelf: 'center',
+    width: 520,
+    height: 520,
+    borderRadius: 260,
+    backgroundColor: '#1a56db',
+    opacity: 0.1,
+  },
+
+  scroll: { flexGrow: 1, justifyContent: 'center', padding: spacing.xl, paddingTop: 80 },
+
   marca: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
-    color: colors.textSubtle,
-    letterSpacing: 3,
+    color: colors.accentBlue,
+    letterSpacing: 4,
     marginBottom: spacing.xl,
   },
   titulo: {
-    ...typography.displayLarge,
+    fontSize: 40,
+    fontWeight: '800',
     color: colors.text,
+    letterSpacing: -1.5,
+    lineHeight: 46,
+    marginBottom: spacing.md,
   },
   subtitulo: {
     ...typography.body,
     color: colors.textMuted,
-    marginTop: 6,
+    marginBottom: spacing.xxxl,
   },
-  rodape: {
-    ...typography.small,
-    color: colors.textDisabled,
-    textAlign: 'center',
-    paddingBottom: spacing.xxl,
-    paddingHorizontal: spacing.xl,
-  },
+
+  form: { width: '100%' },
+
   linhaInferior: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -183,5 +209,13 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
   linhaTxt: { ...typography.small, color: colors.textMuted },
-  link: { ...typography.smallMedium, color: colors.text },
+  link: { ...typography.smallMedium, color: colors.accentBlue, fontWeight: '600' },
+
+  rodape: {
+    ...typography.small,
+    color: colors.textDisabled,
+    textAlign: 'center',
+    paddingBottom: spacing.xxl,
+    paddingHorizontal: spacing.xl,
+  },
 });

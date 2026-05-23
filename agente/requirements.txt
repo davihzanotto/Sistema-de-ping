@@ -1,6 +1,6 @@
 requests==2.32.3
 pystray==0.19.5
 Pillow==11.0.0
-ping3==4.0.8
 pyinstaller==6.11.1
 python-dotenv==1.0.1
+opencv-python-headless==4.10.0.84

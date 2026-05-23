@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
 import {
@@ -23,7 +24,7 @@ import { useToast } from '@/components/Toast';
 import { EmptyState } from '@/components/EmptyState';
 import { ActionSheet, ActionItem } from '@/components/ActionSheet';
 import { useConfirm } from '@/components/ConfirmDialog';
-import { colors, spacing, typography } from '@/theme/theme';
+import { colors, gradients, radius, shadows, spacing, typography } from '@/theme/theme';
 
 export function DashboardScreen({ navigation }: any) {
   const { usuario } = useAuth();
@@ -47,17 +48,12 @@ export function DashboardScreen({ navigation }: any) {
     }
   }
 
-  useFocusEffect(
-    useCallback(() => {
-      carregar();
-    }, []),
-  );
+  useFocusEffect(useCallback(() => { carregar(); }, []));
 
   async function excluir(condo: CondominioStatus) {
     const ok = await confirmar({
       title: `Excluir ${condo.nome}?`,
-      message:
-        'Excluir vai remover todas as câmeras e o histórico deste condomínio. Esta ação não pode ser desfeita.',
+      message: 'Excluir vai remover todas as câmeras e o histórico deste condomínio. Esta ação não pode ser desfeita.',
       confirmText: 'Excluir',
       cancelText: 'Cancelar',
       destructive: true,
@@ -78,8 +74,7 @@ export function DashboardScreen({ navigation }: any) {
           key: 'editar',
           label: 'Editar',
           icon: 'create-outline',
-          onPress: () =>
-            navigation.navigate('EditarCondominio', { id: acoesAlvo.id }),
+          onPress: () => navigation.navigate('EditarCondominio', { id: acoesAlvo.id }),
         },
         {
           key: 'excluir',
@@ -91,8 +86,7 @@ export function DashboardScreen({ navigation }: any) {
       ]
     : [];
 
-  const nomePrimeiro =
-    usuario?.nome?.split(' ')[0] ?? usuario?.email?.split('@')[0] ?? '';
+  const nomePrimeiro = usuario?.nome?.split(' ')[0] ?? usuario?.email?.split('@')[0] ?? '';
   const hora = new Date().getHours();
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
   const letra = (nomePrimeiro || 'U').charAt(0).toUpperCase();
@@ -106,46 +100,38 @@ export function DashboardScreen({ navigation }: any) {
           <RefreshControl
             refreshing={carregando}
             onRefresh={carregar}
-            tintColor={colors.textMuted}
+            tintColor={colors.accentBlue}
           />
         }
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListHeaderComponent={
           <View>
-            <View style={styles.header}>
-              <Text style={styles.marca}>TRIETEL</Text>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarTxt}>{letra}</Text>
+            <LinearGradient
+              colors={['#0d1b4b', '#000000']}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={styles.headerGradient}
+            >
+              <View style={styles.headerTop}>
+                <Text style={styles.marca}>TRIETEL</Text>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarTxt}>{letra}</Text>
+                </View>
               </View>
-            </View>
-
-            <View style={styles.titleBlock}>
               <Text style={styles.saudacao}>
-                {saudacao}
-                {nomePrimeiro ? `, ${nomePrimeiro}` : ''}
+                {saudacao}{nomePrimeiro ? `, ${nomePrimeiro}` : ''}
               </Text>
               <Text style={styles.titulo}>Condomínios</Text>
-            </View>
+            </LinearGradient>
 
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>
                 {dados.length} {dados.length === 1 ? 'cadastrado' : 'cadastrados'}
               </Text>
-              <Pressable
-                onPress={() => navigation.navigate('NovoCondominio')}
-                hitSlop={10}
-                style={styles.novoBtn}
-              >
-                <Ionicons name="add" size={14} color={colors.textMuted} />
-                <Text style={styles.novoTxt}>Novo</Text>
-              </Pressable>
             </View>
-
-            {dados.length > 0 && <View style={styles.separator} />}
           </View>
         }
         renderItem={({ item }) => (
-          <CondominioRow
+          <CondominioCard
             item={item}
             onPress={() =>
               navigation.navigate('CondominioDetalhe', { id: item.id, nome: item.nome })
@@ -156,18 +142,32 @@ export function DashboardScreen({ navigation }: any) {
         ListEmptyComponent={
           primeiraCarga ? (
             <View style={styles.loadingWrap}>
-              <ActivityIndicator color={colors.textMuted} />
+              <ActivityIndicator color={colors.accentBlue} size="large" />
             </View>
           ) : (
             <EmptyState
               icon="business-outline"
               title="Nenhum condomínio"
-              subtitle="Crie seu primeiro condomínio para começar."
+              subtitle="Toque no + para criar seu primeiro condomínio."
             />
           )
         }
-        contentContainerStyle={{ paddingBottom: 60 }}
+        contentContainerStyle={{ paddingBottom: 100 }}
       />
+
+      <Pressable
+        onPress={() => navigation.navigate('NovoCondominio')}
+        style={styles.fabWrap}
+      >
+        <LinearGradient
+          colors={gradients.primary}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.fab}
+        >
+          <Ionicons name="add" size={28} color="#fff" />
+        </LinearGradient>
+      </Pressable>
 
       <ActionSheet
         visible={!!acoesAlvo}
@@ -180,7 +180,7 @@ export function DashboardScreen({ navigation }: any) {
   );
 }
 
-function CondominioRow({
+function CondominioCard({
   item,
   onPress,
   onLongPress,
@@ -196,142 +196,148 @@ function CondominioRow({
     ? colors.textSubtle
     : colors.success;
 
+  const legenda = temOffline
+    ? `${item.offline} câmera${item.offline > 1 ? 's' : ''} offline`
+    : item.total_cameras === 0
+    ? 'Sem câmeras cadastradas'
+    : 'Todas online';
+
   return (
     <Pressable
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={350}
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface }]}
+      style={({ pressed }) => [styles.card, pressed && { opacity: 0.75 }]}
     >
-      <View style={{ flex: 1, paddingRight: spacing.md }}>
-        <Text style={styles.rowNome} numberOfLines={1}>
-          {item.nome}
-        </Text>
-        {item.endereco ? (
-          <Text style={styles.rowEndereco} numberOfLines={1}>
-            {item.endereco}
-          </Text>
-        ) : null}
-      </View>
-
-      <View style={styles.rowRight}>
-        <View style={styles.rowStatus}>
-          <View style={[styles.statusDot, { backgroundColor: cor }]} />
-          <Text style={styles.rowCount}>
-            {item.online}
-            <Text style={styles.rowCountMuted}>/{item.total_cameras}</Text>
-          </Text>
+      <View style={[styles.cardAccent, { backgroundColor: cor }]} />
+      <View style={styles.cardContent}>
+        <View style={styles.cardTop}>
+          <View style={{ flex: 1, paddingRight: spacing.md }}>
+            <Text style={styles.cardNome} numberOfLines={1}>{item.nome}</Text>
+            {item.endereco ? (
+              <Text style={styles.cardEndereco} numberOfLines={1}>{item.endereco}</Text>
+            ) : null}
+          </View>
+          <View style={styles.cardCount}>
+            <Text style={[styles.countNum, { color: cor }]}>{item.online}</Text>
+            <Text style={styles.countTotal}>/{item.total_cameras}</Text>
+          </View>
         </View>
-        <Ionicons
-          name="chevron-forward"
-          size={14}
-          color={colors.textSubtle}
-          style={{ marginLeft: 10 }}
-        />
+        <View style={styles.cardFooter}>
+          <View style={[styles.legendaPill, { backgroundColor: cor + '18' }]}>
+            <View style={[styles.legendaDot, { backgroundColor: cor }]} />
+            <Text style={[styles.legendaTxt, { color: cor }]}>{legenda}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={14} color={colors.textSubtle} />
+        </View>
       </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#000000' },
 
-  header: {
+  headerGradient: {
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xxxl,
+    paddingHorizontal: spacing.xl,
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xxl,
+    marginBottom: spacing.xxl,
   },
-  marca: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.text,
-    letterSpacing: 2,
-  },
+  marca: { fontSize: 12, fontWeight: '700', color: colors.accentBlue, letterSpacing: 4 },
   avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(26,86,219,0.25)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(96,165,250,0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarTxt: { fontSize: 11, fontWeight: '600', color: colors.textMuted },
-
-  titleBlock: {
-    paddingHorizontal: spacing.xl,
-    marginBottom: spacing.xxxl,
-  },
-  saudacao: {
-    ...typography.small,
-    color: colors.textMuted,
-    marginBottom: 6,
-  },
-  titulo: {
-    ...typography.display,
-    color: colors.text,
-  },
+  avatarTxt: { fontSize: 14, fontWeight: '700', color: colors.accentBlue },
+  saudacao: { ...typography.small, color: colors.textMuted, marginBottom: 6 },
+  titulo: { fontSize: 34, fontWeight: '800', color: colors.text, letterSpacing: -1 },
 
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.xl,
-    marginBottom: spacing.md,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.md,
   },
   sectionTitle: {
     fontSize: 11,
     fontWeight: '500',
     color: colors.textSubtle,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: 1,
   },
-  novoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  novoTxt: { fontSize: 12, fontWeight: '500', color: colors.textMuted },
 
-  separator: {
-    height: 1,
-    backgroundColor: colors.border,
+  card: {
     marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+    borderRadius: radius.xl,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    ...shadows.card,
   },
-
-  row: {
+  cardAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+  },
+  cardContent: {
+    paddingVertical: spacing.lg,
+    paddingRight: spacing.lg,
+    paddingLeft: spacing.lg + 3,
+  },
+  cardTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
+  },
+  cardNome: { fontSize: 16, fontWeight: '600', color: colors.text },
+  cardEndereco: { fontSize: 12, color: colors.textMuted, marginTop: 3 },
+  cardCount: { flexDirection: 'row', alignItems: 'flex-end', gap: 1 },
+  countNum: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
+  countTotal: { fontSize: 14, color: colors.textSubtle, fontWeight: '400', paddingBottom: 2 },
+  cardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.xl,
+    justifyContent: 'space-between',
   },
-  rowNome: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: colors.text,
+  legendaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.full,
   },
-  rowEndereco: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: colors.textSubtle,
-    marginTop: 3,
+  legendaDot: { width: 5, height: 5, borderRadius: 3 },
+  legendaTxt: { fontSize: 11, fontWeight: '500' },
+
+  fabWrap: {
+    position: 'absolute',
+    bottom: 32,
+    right: spacing.xl,
   },
-  rowRight: { flexDirection: 'row', alignItems: 'center' },
-  rowStatus: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statusDot: { width: 6, height: 6, borderRadius: 3 },
-  rowCount: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.text,
-    fontVariant: ['tabular-nums'],
+  fab: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.blue,
   },
-  rowCountMuted: { color: colors.textSubtle, fontWeight: '400' },
 
   loadingWrap: { paddingTop: 80, alignItems: 'center' },
 });

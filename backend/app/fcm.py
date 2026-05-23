@@ -1,4 +1,5 @@
 """Integração com Firebase Cloud Messaging."""
+import json
 import logging
 import os
 from typing import List, Optional
@@ -14,23 +15,47 @@ _firebase_app: Optional[firebase_admin.App] = None
 
 
 def _inicializar_firebase() -> Optional[firebase_admin.App]:
-    """Inicializa a SDK do Firebase se as credenciais existirem."""
+    """Inicializa a SDK do Firebase se as credenciais existirem.
+
+    Suporta duas formas:
+    1. FIREBASE_CREDENTIALS_JSON — conteúdo do JSON como string (Railway/env var)
+    2. FIREBASE_CREDENTIALS_PATH — caminho do arquivo (Docker com volume)
+    """
     global _firebase_app
     if _firebase_app is not None:
         return _firebase_app
 
-    caminho = settings.firebase_credentials_path
-    if not caminho or not os.path.isfile(caminho):
+    cred = None
+
+    # Prioridade 1: conteúdo JSON direto na variável de ambiente (Railway)
+    if settings.firebase_credentials_json:
+        try:
+            dados = json.loads(settings.firebase_credentials_json)
+            cred = credentials.Certificate(dados)
+            logger.info("Firebase inicializado via FIREBASE_CREDENTIALS_JSON")
+        except Exception as exc:
+            logger.error("Falha ao parsear FIREBASE_CREDENTIALS_JSON: %s", exc)
+            return None
+
+    # Prioridade 2: arquivo no disco (Docker com volume montado)
+    elif os.path.isfile(settings.firebase_credentials_path):
+        try:
+            cred = credentials.Certificate(settings.firebase_credentials_path)
+            logger.info("Firebase inicializado via arquivo %s", settings.firebase_credentials_path)
+        except Exception as exc:
+            logger.error("Falha ao ler credenciais Firebase: %s", exc)
+            return None
+
+    else:
         logger.warning(
-            "Credenciais Firebase não encontradas em %s — push desabilitado", caminho
+            "Credenciais Firebase não encontradas — push desabilitado. "
+            "Configure FIREBASE_CREDENTIALS_JSON ou FIREBASE_CREDENTIALS_PATH."
         )
         return None
 
     try:
-        cred = credentials.Certificate(caminho)
         _firebase_app = firebase_admin.initialize_app(cred)
-        logger.info("Firebase inicializado com sucesso")
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:
         logger.error("Falha ao inicializar Firebase: %s", exc)
         _firebase_app = None
     return _firebase_app

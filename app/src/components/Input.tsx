@@ -38,7 +38,7 @@ export function Input({
   const borderColor = errorText
     ? colors.danger
     : focused
-    ? colors.borderStrong
+    ? colors.accentBlue
     : colors.border;
 
   return (
@@ -48,8 +48,8 @@ export function Input({
         {icon && (
           <Ionicons
             name={icon}
-            size={15}
-            color={focused ? colors.text : colors.textSubtle}
+            size={16}
+            color={focused ? colors.accentBlue : colors.textSubtle}
             style={{ marginRight: 10 }}
           />
         )}
@@ -71,13 +71,13 @@ export function Input({
           <Pressable onPress={() => setHidden((v) => !v)} hitSlop={10}>
             <Ionicons
               name={hidden ? 'eye-outline' : 'eye-off-outline'}
-              size={15}
-              color={colors.textMuted}
+              size={16}
+              color={focused ? colors.accentBlue : colors.textMuted}
             />
           </Pressable>
         )}
         {success && !password && (
-          <Ionicons name="checkmark" size={15} color={colors.success} />
+          <Ionicons name="checkmark-circle" size={16} color={colors.success} />
         )}
       </View>
       {errorText ? (
@@ -99,15 +99,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    height: 42,
-    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.lg,
+    height: 52,
+    backgroundColor: '#111827',
   },
   input: {
     flex: 1,
     color: colors.text,
-    fontSize: 14,
+    fontSize: 15,
     paddingVertical: 0,
     fontWeight: '400',
   },

@@ -2,11 +2,13 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     ForeignKey,
     Integer,
     String,
+    Text,
 )
 from sqlalchemy.orm import relationship
 
@@ -97,3 +99,71 @@ class Dispositivo(Base):
     criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     usuario = relationship("Usuario", back_populates="dispositivos")
+
+
+class AgenteInfo(Base):
+    """Metadados que o agente envia periodicamente (IP local etc.).
+
+    Tabela separada da Condominio para evitar migração de schema.
+    """
+
+    __tablename__ = "agente_info"
+
+    condominio_id = Column(
+        Integer,
+        ForeignKey("condominios.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    ip_local = Column(String(45), nullable=True)
+    versao_agente = Column(String(20), nullable=True)
+    atualizado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class Scan(Base):
+    """Tarefa de scan de rede solicitada pelo app, executada pelo agente."""
+
+    __tablename__ = "scans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    condominio_id = Column(
+        Integer,
+        ForeignKey("condominios.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    ip_inicio = Column(String(45), nullable=False)
+    ip_fim = Column(String(45), nullable=False)
+    # pendente | executando | concluido | erro | cancelado
+    status = Column(String(20), default="pendente", nullable=False, index=True)
+    total_ips = Column(Integer, default=0, nullable=False)
+    progresso = Column(Integer, default=0, nullable=False)
+    mensagem_erro = Column(Text, nullable=True)
+    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+    iniciado_em = Column(DateTime, nullable=True)
+    finalizado_em = Column(DateTime, nullable=True)
+
+    resultados = relationship(
+        "ScanResultado", back_populates="scan", cascade="all, delete-orphan"
+    )
+
+
+class ScanResultado(Base):
+    """Resultado de um IP individual durante o scan."""
+
+    __tablename__ = "scan_resultados"
+
+    id = Column(Integer, primary_key=True, index=True)
+    scan_id = Column(
+        Integer, ForeignKey("scans.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    ip = Column(String(45), nullable=False)
+    online = Column(Boolean, default=False, nullable=False)
+    porta_554 = Column(Boolean, default=False, nullable=False)
+    porta_80 = Column(Boolean, default=False, nullable=False)
+    porta_8080 = Column(Boolean, default=False, nullable=False)
+    # camera | provavel | outro
+    confianca = Column(String(20), default="outro", nullable=False)
+    frame_base64 = Column(Text, nullable=True)
+    criado_em = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    scan = relationship("Scan", back_populates="resultados")
